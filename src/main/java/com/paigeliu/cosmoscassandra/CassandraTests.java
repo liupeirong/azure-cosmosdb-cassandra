@@ -84,7 +84,7 @@ public class CassandraTests {
 
     public void RunLoadTest(String datafile) 
     {
-        ExecutorService service = Executors.newScheduledThreadPool(numOfThreads);
+        ExecutorService service = numOfThreads > 1 ? Executors.newScheduledThreadPool(numOfThreads) : null;
         MappingManager manager = new MappingManager(session);
         Mapper<RecordToInsert> mapper_record_to_insert = manager.mapper(RecordToInsert.class);
         //read in the file and shuffle
@@ -96,6 +96,11 @@ public class CassandraTests {
         Date start = Calendar.getInstance().getTime();
         for (RecordToInsert row: rows)
         {
+            if (service == null)
+            {
+                mapper_record_to_insert.save(row);
+            }
+            else
             service.submit(() -> 
             {
                 int numOfAttempts = 0;
@@ -157,7 +162,7 @@ public class CassandraTests {
 
         try 
         {
-            latch.await();
+            if (numOfThreads > 1) latch.await();
         }
         catch (InterruptedException e)
         {
