@@ -21,6 +21,7 @@ public class CassandraUtils {
     private String cassandraPassword = "defaultpassword";
     private File sslKeyStoreFile = null;
     private String sslKeyStorePassword = "changeit";
+    private Boolean enableSSL = true;
 
     /**
      * This method creates a Cassandra Session based on the the end-point details given in config.properties.
@@ -34,38 +35,44 @@ public class CassandraUtils {
             //Load cassandra endpoint details from config.properties
             loadCassandraConnectionDetails();
 
-            final KeyStore keyStore = KeyStore.getInstance("JKS");
-            try (final InputStream is = new FileInputStream(sslKeyStoreFile)) {
-                keyStore.load(is, sslKeyStorePassword.toCharArray());
+            Cluster.Builder cb = Cluster.builder();
+
+            if (enableSSL)
+            {
+                final KeyStore keyStore = KeyStore.getInstance("JKS");
+                try (final InputStream is = new FileInputStream(sslKeyStoreFile)) {
+                    keyStore.load(is, sslKeyStorePassword.toCharArray());
+                }
+
+                final KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory
+                        .getDefaultAlgorithm());
+                kmf.init(keyStore, sslKeyStorePassword.toCharArray());
+                final TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory
+                        .getDefaultAlgorithm());
+                tmf.init(keyStore);
+
+                // Creates a socket factory for HttpsURLConnection using JKS contents.
+                final SSLContext sc = SSLContext.getInstance("TLSv1.2");
+                sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new java.security.SecureRandom());
+
+                JdkSSLOptions sslOptions = RemoteEndpointAwareJdkSSLOptions.builder()
+                        .withSSLContext(sc)
+                        .build();
+                
+                cb.withSSL(sslOptions);
             }
-
-            final KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory
-                    .getDefaultAlgorithm());
-            kmf.init(keyStore, sslKeyStorePassword.toCharArray());
-            final TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory
-                    .getDefaultAlgorithm());
-            tmf.init(keyStore);
-
-            // Creates a socket factory for HttpsURLConnection using JKS contents.
-            final SSLContext sc = SSLContext.getInstance("TLSv1.2");
-            sc.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new java.security.SecureRandom());
-
-            JdkSSLOptions sslOptions = RemoteEndpointAwareJdkSSLOptions.builder()
-                    .withSSLContext(sc)
-                    .build();
 
             PoolingOptions poolOptions = new PoolingOptions();
             int numOfThreads = Integer.parseInt(config.getProperty("num_of_threads"));
             poolOptions.setCoreConnectionsPerHost(HostDistance.LOCAL, numOfThreads);
             poolOptions.setMaxConnectionsPerHost(HostDistance.LOCAL, numOfThreads);
 
-            cluster = Cluster.builder()
-                    .addContactPoint(cassandraHost)
-                    .withPort(cassandraPort)
-                    .withCredentials(cassandraUsername, cassandraPassword)
-                    .withPoolingOptions(poolOptions)
-                    .withSSL(sslOptions)
-                    .build();
+            cluster = cb
+                .addContactPoint(cassandraHost)
+                .withPort(cassandraPort)
+                .withCredentials(cassandraUsername, cassandraPassword)
+                .withPoolingOptions(poolOptions)
+                .build();
 
             return cluster.connect();
         } catch (Exception ex) {
@@ -87,6 +94,10 @@ public class CassandraUtils {
         cassandraPort = Integer.parseInt(config.getProperty("cassandra_port"));
         cassandraUsername = config.getProperty("cassandra_username");
         cassandraPassword = config.getProperty("cassandra_password");
+        enableSSL = Boolean.parseBoolean(config.getProperty("enable_ssl"));
+        
+        if (!enableSSL) return;
+
         String ssl_keystore_file_path = config.getProperty("ssl_keystore_file_path");
         String ssl_keystore_password = config.getProperty("ssl_keystore_password");
 

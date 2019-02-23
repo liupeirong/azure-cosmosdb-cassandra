@@ -42,8 +42,49 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>**/*.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId> 
+                <executions>
+                    <execution>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                    <configuration>
+                        <filters>
+                            <filter>
+                                <artifact>*:*</artifact>
+                                <excludes>
+                                    <exclude>META-INF/*.SF</exclude>
+                                    <exclude>META-INF/*.DSA</exclude>
+                                    <exclude>META-INF/*.RSA</exclude>
+                                </excludes>
+                            </filter>
+                        </filters>
+                        <shadedArtifactAttached>true</shadedArtifactAttached>
+                        <transformers>
+                            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <mainClass>com.paigeliu.cosmoscassandra.App</mainClass>
+                                <manifestEntries>
+                                    <Class-Path>conf/</Class-Path> <!--we can read resources/properties in conf folder relatvie to the jar-->
+                                </manifestEntries>
+                            </transformer>
+                        </transformers>
+                    </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--plugin>
+                maven-assembly-plugin does not have class relocation support, can't put properties file in a custom folder outside the jar
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
                     <descriptorRefs>
@@ -55,6 +96,9 @@
                         <manifest>
                             <mainClass>com.paigeliu.cosmoscassandra.App</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Class-Path>.</Class-Path>
+                        </manifestEntries>
                     </archive>
                 </configuration>
                 <executions>
@@ -66,7 +110,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin!-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

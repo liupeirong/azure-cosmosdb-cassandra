@@ -21,6 +21,7 @@ import com.datastax.driver.core.ExecutionInfo;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.mapping.Mapper;
 import com.datastax.driver.mapping.MappingManager;
+import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.OverloadedException;
 
 import com.microsoft.azure.documentdb.*;
@@ -106,52 +107,49 @@ public class CassandraTests {
                         mapper_record_to_insert.save(row);
                         shouldRetry = false;
                     }
-                    catch (OverloadedException throttle)
+                    catch (NoHostAvailableException e)
                     {
-                        LOGGER.warn("query being throttled: {}th time.", numOfAttempts);
-                        try
+                        shouldRetry = e.getMessage().contains("OverloadedException");
+                        if (shouldRetry)
                         {
                             ++numOfAttempts;
+                            LOGGER.warn("No host OverloadedException: {} times.", numOfAttempts);
                             ExponentialBackoff(numOfAttempts);
-                        }
-                        catch(Exception ex)
-                        {
-                            shouldRetry = false;
-                            LOGGER.error(ex.getMessage());
-                        }
-                    }
-                    catch (IllegalStateException e)
-                    {
-                        LOGGER.error("illegal state exception: {}", e.getMessage());
-                        Boolean IsThrottled = HandleThrottle(e);
-
-                        if (IsThrottled)
-                        {
-                            try
-                            {
-                                ++numOfAttempts;
-                                ExponentialBackoff(numOfAttempts);
-                            }
-                            catch(Exception ex)
-                            {
-                                shouldRetry = false;
-                                LOGGER.error(ex.getMessage());
-                            }
                         }
                         else
                         {
-                            shouldRetry = false;
+                            LOGGER.error("NoHostAvailableException: {}", e.getMessage());
                         }
                     }
-                    catch (Exception unknownException)
+                    catch (OverloadedException throttle) 
                     {
-                        LOGGER.error("unknown exception: {}", unknownException.getMessage());
+                        ++numOfAttempts;
+                        LOGGER.warn("OverloadedException: {}th time.", numOfAttempts);
+                        ExponentialBackoff(numOfAttempts);
+                    }
+                    catch (IllegalStateException e)
+                    {
+                        shouldRetry = HandleThrottle(e);
+                        if (shouldRetry)
+                        {
+                            ++numOfAttempts;
+                            LOGGER.error("Illegal State OverloadedException: {}", e.getMessage());
+                            ExponentialBackoff(numOfAttempts);
+                        }
+                        else
+                        {
+                            LOGGER.error("IllegalStateException: {}", e.getMessage());
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        LOGGER.error("Unknown Exception: {}", e.getMessage());
                         shouldRetry = false;
                     }
                 }
 
-                if (!shouldRetry) latch.countDown();
-                LOGGER.info("latch countdown {}", latch.getCount());
+                LOGGER.info("Latch countdown {}", latch.getCount());
+                latch.countDown();
             });
 
             LOGGER.info("Processed {} rows", ++rowsProcessed);
@@ -161,15 +159,15 @@ public class CassandraTests {
         {
             latch.await();
         }
-       catch (InterruptedException e)
+        catch (InterruptedException e)
         {
-            LOGGER.error ("latch await exception: {}", e.getMessage());
+            LOGGER.error ("Latch await exception: {}", e.getMessage());
         } 
         finally 
         {
             Date end = Calendar.getInstance().getTime();
             long durationInSec = (end.getTime() - start.getTime())/1000;
-            LOGGER.info("test took {} seconds.", durationInSec);
+            LOGGER.info("Test took {} seconds.", durationInSec);
             service.shutdown();
         }
     }
@@ -234,10 +232,14 @@ public class CassandraTests {
         return result;
     }
 
-    private static void ExponentialBackoff(int numOfAttempts) throws InterruptedException
+    private void ExponentialBackoff(int numOfAttempts)
     {
-        int waitTimeInMilliSeconds = PowerOfTwoWithCeiling(numOfAttempts) * 100;
-        LOGGER.info("Exponential backoff: Retrying after Waiting for {} milliseconds", waitTimeInMilliSeconds);
-        Thread.sleep(waitTimeInMilliSeconds);
+        try {
+            int waitTimeInMilliSeconds = PowerOfTwoWithCeiling(numOfAttempts) * 100;
+            LOGGER.info("Exponential backoff: Retrying after Waiting for {} milliseconds", waitTimeInMilliSeconds);
+            Thread.sleep(waitTimeInMilliSeconds);
+        } catch (InterruptedException e) {
+            LOGGER.error("Exponential backoff exception {}", e.getMessage());
+        }
     }
 }
