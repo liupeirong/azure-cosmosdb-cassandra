@@ -1,6 +1,13 @@
 // Databricks notebook source
 // MAGIC %md
 // MAGIC This sample attempts to ingest a csv file to Cosmos DB Cassandra API by optimizing parallelism to fully utilize the allocated Cosmos DB throughput
+// MAGIC * The cluster must have the following libraries, make sure the versions match the Spark and Scala version of your cluster:
+// MAGIC 
+// MAGIC ```
+// MAGIC com.datastax.spark:spark-cassandra-connector_2.11:2.4.0
+// MAGIC com.microsoft.azure.cosmosdb:azure-cosmos-cassandra-spark-helper:1.0.0
+// MAGIC ```
+// MAGIC 
 // MAGIC * The cluster should be configured with Cosmos DB Cassandra API connection info as following:
 // MAGIC 
 // MAGIC ```
@@ -9,13 +16,7 @@
 // MAGIC spark.cassandra.auth.password {cosmos db account key}
 // MAGIC spark.cassandra.connection.port 10350
 // MAGIC spark.cassandra.connection.ssl.enabled true
-// MAGIC ```
-// MAGIC 
-// MAGIC * The cluster must have the following libraries, make sure the versions match the Spark and Scala version of your cluster:
-// MAGIC 
-// MAGIC ```
-// MAGIC com.datastax.spark:spark-cassandra-connector_2.11:2.4.0
-// MAGIC com.microsoft.azure.cosmosdb:azure-cosmos-cassandra-spark-helper:1.0.0
+// MAGIC spark.cassandra.connection.factory com.microsoft.azure.cosmosdb.cassandra.CosmosDbConnectionFactory
 // MAGIC ```
 // MAGIC 
 // MAGIC * The csv file must have 3 columns - integer, double, and float. It uses comma as a separator, and must not have a header row.
@@ -41,7 +42,9 @@ import com.microsoft.azure.cosmosdb.cassandra
 import org.apache.spark.sql.types._
 import java.util.Calendar
 
-spark.conf.set("spark.cassandra.connection.factory", "com.microsoft.azure.cosmosdb.cassandra.CosmosDbConnectionFactory")
+// Using Databricks, the following must be set at the cluster level, not in the Notebook. 
+// Otherwise, the lib won't take effect and can't handle overload exceptions effectively, your job could run slowly or fails due to overload
+//spark.conf.set("spark.cassandra.connection.factory", "com.microsoft.azure.cosmosdb.cassandra.CosmosDbConnectionFactory")
 
 // COMMAND ----------
 
@@ -51,11 +54,11 @@ val num_of_nodes = 2
 val num_of_cores_per_node = 4
 
 //Configure parallelism and throughput
-//spark.conf.set("spark.cassandra.connection.connections_per_executor_max", "4") //default 1
-//spark.conf.set("spark.cassandra.connection.keep_alive_ms", "6000") //default 5000
-//spark.conf.set("spark.cassandra.output.throughput_mb_per_sec", "3") //throughput mb/s/core, default 2147483647 (max of integer)
-//spark.conf.set("spark.cassandra.output.batch.size.rows", "1") //default auto
-spark.conf.set("spark.cassandra.output.concurrent.writes", "1") //Maximum number of batches executed in parallel by a single Spark task
+spark.conf.set("spark.cassandra.output.batch.size.rows", "1") //default auto
+spark.conf.set("spark.cassandra.output.concurrent.writes", "4") //Maximum number of batches executed in parallel by a single Spark task, similar to 4 threads
+spark.conf.set("spark.cassandra.connection.connections_per_executor_max", "4") //default 1
+
+//If each operation is N RU, with this setting we'll need 2nodes x 4cores/node x 4threads/core x 200writes/thread x N RU/write allocated in Cosmos
 
 // COMMAND ----------
 
