@@ -1,0 +1,53 @@
+
+#
+# Keyspace info
+#
+keyspace: mytestks
+
+#
+# The CQL for creating a keyspace (optional if it already exists)
+#
+keyspace_definition: |
+ CREATE KEYSPACE mytestks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 4} AND cosmosdb_provisioned_throughput=40000;
+
+#
+# Table info
+#
+table: testtbl
+
+#
+# The CQL for creating a table you wish to stress (optional if it already exists)
+#
+table_definition: |
+  CREATE TABLE mytestks.testtbl (
+    c1 varint,
+    c2 double,
+    c3 float,
+    PRIMARY KEY (c1,c2))
+
+#    WITH cosmosdb_provisioned_throughput=40000
+
+#
+# Defaults for all columns are size: uniform(4..8), population: uniform(1..100B), cluster: fixed(1)
+#
+
+columnspec:
+  - name: c1
+    size: uniform(400..820)
+  - name: c2
+    size: uniform(10..34660)
+  - name: c3
+    size: uniform(10000..150000)
+
+insert:
+  # How many partition to insert per batch
+  partitions: fixed(1)
+  # How many rows to update per partition
+  select: fixed(1)/1
+  # UNLOGGED or LOGGED batch for insert
+  batchtype: UNLOGGED
+
+queries:
+  query1: 
+    cql: select * from testtbl where key = ?
+    fields: samerow  
