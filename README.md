@@ -69,4 +69,4 @@ cassandra-stress user profile=cassandrastress.yaml no-warmup ops\(insert=1\) n=2
 The median latency is 5.7ms, and the 99th percentile is a little over 15ms. The cluster is overloaded during the run as shown below, so there are a lot of retries which count as op/s.  The data is evenly distributed among partitions. 
 ![successful and overloaded requests](images/casstressreqs.jpg)
 
-![RUs by partition](images/casstressrupp.jpg) ![Partitions](images/casstressp.jpg)
+![RUs by partition](images/casstressrupp.jpg)
