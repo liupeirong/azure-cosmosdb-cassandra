@@ -42,9 +42,11 @@ Instead of writing a multi-threaded application, you can also run workloads on S
 ## Run cassandra-stress tool
 You can run [the cassandra-stress tool](https://docs.datastax.com/en/cassandra/3.0/cassandra/tools/toolsCStress.html) against Cosmos DB. While it may not represent real world workload perfectly, it's at least a great way to check your Cosmos DB is performing as expected for the synthetic workload you specify. 
 
-This sample [cassandra-stress yaml file](cassandrastress.yml) simulate the same table structure and similar data distribution as in the above example. You can run cassandra-stress with the following command:
+This sample [cassandra-stress yaml file](cassandrastress.yaml) simulates the same table structure and similar data distribution as in the above example. You can run cassandra-stress with the following command:
 ```sh
 cassandra-stress user profile=cassandrastress.yaml no-warmup ops\(insert=1\) n=2000000 cl=QUORUM -rate threads=128 -node {cosmos_db_account}.cassandra.cosmosdb.azure.com -port native=10350 -transport ssl-protocol=TLSv1.2 factory=org.apache.cassandra.thrift.SSLTransportFactory truststore={/path/to/truststore} truststore-password={password} -mode native cql3 connectionsPerHost=128 user={cosmos_db_account} password={cosmos_db_key}
+
+#here's the output
 
 	Op rate                   :    8,380 op/s  [insert: 8,380 op/s]
 	Partition rate            :    8,380 pk/s  [insert: 8,380 pk/s]
@@ -64,7 +66,7 @@ cassandra-stress user profile=cassandrastress.yaml no-warmup ops\(insert=1\) n=2
 	StdDev GC time            :    0.0 ms
 	Total operation time      : 00:04:20
 ``` 
-You can see the median latency is 5.7ms, and the 99th percentile is a little over 15ms. The cluster is overloaded during the run as shown below, so there are a lot of retries which count as op/s.  The data is evenly distributed among partitions. 
+The median latency is 5.7ms, and the 99th percentile is a little over 15ms. The cluster is overloaded during the run as shown below, so there are a lot of retries which count as op/s.  The data is evenly distributed among partitions. 
 ![successful and overloaded requests](images/casstressreqs.jpg)
 
 ![RUs by partition](images/casstressrupp.jpg) ![Partitions](images/casstressp.jpg)
